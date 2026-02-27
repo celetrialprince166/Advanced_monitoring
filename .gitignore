@@ -75,7 +75,7 @@ crash.*.log
 node_modules/
 jspm_packages/
 bower_components/
-
+ai-agent-prompts-github.xml
 # Build output
 dist/
 build/
@@ -210,6 +210,7 @@ junit.xml
 
 # CI/CD artifacts
 artifacts/
+jenkinsbuild.txt
 
 # =============================================================================
 # MISCELLANEOUS

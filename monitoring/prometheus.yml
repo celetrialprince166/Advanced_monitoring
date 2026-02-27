@@ -54,7 +54,7 @@ scrape_configs:
   - job_name: notes-backend-ecs
     static_configs:
       - targets:
-          - "dev-notes-app-alb-229621371.eu-west-1.elb.amazonaws.com:80"
+          - "dev-notes-app-alb-264184114.eu-west-1.elb.amazonaws.com:80"
         labels:
           instance: ecs-backend
           service: nestjs-backend
