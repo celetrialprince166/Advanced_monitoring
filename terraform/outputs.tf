@@ -261,10 +261,10 @@ output "cloudtrail_s3_bucket_arn" {
   value       = aws_s3_bucket.cloudtrail.arn
 }
 
-output "guardduty_detector_id" {
-  description = "GuardDuty detector ID"
-  value       = aws_guardduty_detector.main.id
-}
+# output "guardduty_detector_id" {
+#   description = "GuardDuty detector ID"
+#   value       = aws_guardduty_detector.main.id
+# }
 
 output "observability_summary" {
   description = "Summary of observability and security resources"
@@ -273,7 +273,7 @@ output "observability_summary" {
     grafana_url          = "http://${aws_instance.monitoring.public_ip}:3000"
     cloudwatch_log_group = "/notes-app/containers"
     cloudtrail_bucket    = aws_s3_bucket.cloudtrail.bucket
-    guardduty_detector   = aws_guardduty_detector.main.id
+    # guardduty_detector   = aws_guardduty_detector.main.id
     app_server_ip        = aws_instance.notes_app.public_ip
     monitoring_server_ip = aws_instance.monitoring.public_ip
   }

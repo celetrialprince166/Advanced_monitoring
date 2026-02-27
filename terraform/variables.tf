@@ -40,7 +40,7 @@ variable "project_owner" {
 variable "git_repo_url" {
   description = "Git repository URL for the application"
   type        = string
-  default     = "https://github.com/celetrialprince166/Multi_Container_App"
+  default     = "https://github.com/celetrialprince166/Advanced_monitoring.git"
 }
 
 # =============================================================================

@@ -85,9 +85,9 @@ resource "aws_ecs_service" "notes_app" {
     assign_public_ip = true
   }
 
-  service_registries {
-    registry_arn = aws_service_discovery_service.notes_backend.arn
-  }
+  # service_registries {
+  #   registry_arn = aws_service_discovery_service.notes_backend.arn
+  # }
 
   load_balancer {
     target_group_arn = aws_lb_target_group.notes_app.arn
