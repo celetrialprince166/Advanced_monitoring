@@ -456,28 +456,30 @@ pipeline {
             }
             steps {
                 echo '📤 Pushing images to Amazon ECR...'
-                withCredentials([
-                    string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
-                    string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
-                    string(credentialsId: 'aws-region',            variable: 'AWS_REGION'),
-                    string(credentialsId: 'ecr-registry',          variable: 'ECR_REGISTRY')
-                ]) {
-                    sh """
-                        aws ecr get-login-password --region ${AWS_REGION} \
-                            | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                script {
+                    withCredentials([
+                        string(credentialsId: 'aws-access-key-id',     variable: 'AWS_ACCESS_KEY_ID'),
+                        string(credentialsId: 'aws-secret-access-key', variable: 'AWS_SECRET_ACCESS_KEY'),
+                        string(credentialsId: 'aws-region',            variable: 'AWS_REGION'),
+                        string(credentialsId: 'ecr-registry',          variable: 'ECR_REGISTRY')
+                    ]) {
+                        sh '''
+                            aws ecr get-login-password --region "$AWS_REGION" \
+                                | docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-                        # Backend
-                        docker push ${ECR_REGISTRY}/${BACKEND_IMAGE_NAME}:${env.IMAGE_TAG}
-                        docker push ${ECR_REGISTRY}/${BACKEND_IMAGE_NAME}:latest
+                            # Backend
+                            docker push "$ECR_REGISTRY/$BACKEND_IMAGE_NAME:$IMAGE_TAG"
+                            docker push "$ECR_REGISTRY/$BACKEND_IMAGE_NAME:latest"
 
-                        # Frontend
-                        docker push ${ECR_REGISTRY}/${FRONTEND_IMAGE_NAME}:${env.IMAGE_TAG}
-                        docker push ${ECR_REGISTRY}/${FRONTEND_IMAGE_NAME}:latest
+                            # Frontend
+                            docker push "$ECR_REGISTRY/$FRONTEND_IMAGE_NAME:$IMAGE_TAG"
+                            docker push "$ECR_REGISTRY/$FRONTEND_IMAGE_NAME:latest"
 
-                        # Proxy
-                        docker push ${ECR_REGISTRY}/${PROXY_IMAGE_NAME}:${env.IMAGE_TAG}
-                        docker push ${ECR_REGISTRY}/${PROXY_IMAGE_NAME}:latest
-                    """
+                            # Proxy
+                            docker push "$ECR_REGISTRY/$PROXY_IMAGE_NAME:$IMAGE_TAG"
+                            docker push "$ECR_REGISTRY/$PROXY_IMAGE_NAME:latest"
+                        '''
+                    }
                 }
             }
         }
