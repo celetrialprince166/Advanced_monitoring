@@ -38,6 +38,7 @@ secrets/
 secret.*
 *secret*.json
 *credentials*.json
+JENKINS_CREDENTIALS.txt
 
 # =============================================================================
 # TERRAFORM

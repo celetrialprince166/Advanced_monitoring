@@ -178,3 +178,39 @@ variable "slack_webhook_url" {
     error_message = "Slack webhook URL must start with https://hooks.slack.com/ or be empty."
   }
 }
+
+# =============================================================================
+# Jenkins Credentials
+# =============================================================================
+
+variable "db_username" {
+  description = "Database username for application"
+  type        = string
+  sensitive   = true
+  default     = "notesapp_admin"
+}
+
+variable "db_password" {
+  description = "Database password for application"
+  type        = string
+  sensitive   = true
+  default     = "changeme_use_strong_password"
+}
+
+variable "db_name" {
+  description = "Database name for application"
+  type        = string
+  default     = "notesdb"
+}
+
+variable "sonarcloud_token" {
+  description = "SonarCloud authentication token"
+  type        = string
+  sensitive   = true
+}
+
+variable "slack_token" {
+  description = "Slack Bot OAuth token for Jenkins notifications"
+  type        = string
+  sensitive   = true
+}

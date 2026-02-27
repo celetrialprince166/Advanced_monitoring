@@ -342,4 +342,65 @@ output "codedeploy_deployment_group" {
   value       = aws_codedeploy_deployment_group.notes_app.deployment_group_name
 }
 
+# =============================================================================
+# Jenkins Credentials Outputs (All Secrets for Jenkinsfile)
+# =============================================================================
+
+output "jenkins_credentials" {
+  description = "All credentials needed for Jenkins pipeline configuration"
+  sensitive   = true
+  value = {
+    # AWS Credentials
+    aws_region                  = var.aws_region
+    ecr_registry                = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
+    
+    # EC2 Deployment
+    ec2_host                    = aws_instance.notes_app.public_ip
+    ec2_ssh_private_key         = tls_private_key.notes_app.private_key_pem
+    
+    # Database Credentials
+    db_username                 = var.db_username
+    db_password                 = var.db_password
+    db_name                     = var.db_name
+    
+    # SonarCloud
+    sonarcloud_token            = var.sonarcloud_token
+    
+    # Slack Notifications
+    slack_token                 = var.slack_token
+    
+    # ECS Deployment
+    codedeploy_app_name         = aws_codedeploy_app.notes_app.name
+    codedeploy_deployment_group = aws_codedeploy_deployment_group.notes_app.deployment_group_name
+    ecs_cluster_name            = aws_ecs_cluster.notes_app.name
+    ecs_service_name            = aws_ecs_service.notes_app.name
+    ecs_task_execution_role_arn = aws_iam_role.ecs_task_execution.arn
+    ecs_task_role_arn           = aws_iam_role.ecs_task.arn
+    ecs_alb_dns_name            = aws_lb.notes_app.dns_name
+  }
+}
+
+# Individual outputs for easy CLI access
+output "jenkins_ecr_registry" {
+  description = "ECR registry URL for Jenkins credential: ecr-registry"
+  value       = "${data.aws_caller_identity.current.account_id}.dkr.ecr.${data.aws_region.current.name}.amazonaws.com"
+}
+
+output "jenkins_ec2_ssh_key" {
+  description = "EC2 SSH private key for Jenkins credential: ec2-ssh-key (use: terraform output -raw jenkins_ec2_ssh_key)"
+  value       = tls_private_key.notes_app.private_key_pem
+  sensitive   = true
+}
+
+output "jenkins_setup_commands" {
+  description = "Commands to extract Jenkins credentials from Terraform"
+  value = {
+    "View all credentials"     = "terraform output -json jenkins_credentials | jq"
+    "Get SSH key"              = "terraform output -raw jenkins_ec2_ssh_key"
+    "Get ECR registry"         = "terraform output -raw jenkins_ecr_registry"
+    "Get ECS ALB DNS"          = "terraform output -raw ecs_alb_dns_name"
+    "Get CodeDeploy app name" = "terraform output -raw codedeploy_app_name"
+  }
+}
+
 

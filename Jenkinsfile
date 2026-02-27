@@ -449,9 +449,9 @@ pipeline {
         stage('Push to ECR') {
             when {
                 anyOf {
-                    branch 'gitops'
-                    expression { env.GIT_BRANCH == 'origin/gitops' }
-                    expression { env.GIT_BRANCH == 'refs/heads/gitops' }
+                    branch 'main'
+                    expression { env.GIT_BRANCH == 'origin/main' }
+                    expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
             steps {
@@ -488,9 +488,9 @@ pipeline {
         stage('Render & Register ECS Task Definition') {
             when {
                 anyOf {
-                    branch 'gitops'
-                    expression { env.GIT_BRANCH == 'origin/gitops' }
-                    expression { env.GIT_BRANCH == 'refs/heads/gitops' }
+                    branch 'main'
+                    expression { env.GIT_BRANCH == 'origin/main' }
+                    expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
             steps {
@@ -551,9 +551,9 @@ pipeline {
         stage('Deploy to ECS Service') {
             when {
                 anyOf {
-                    branch 'gitops'
-                    expression { env.GIT_BRANCH == 'origin/gitops' }
-                    expression { env.GIT_BRANCH == 'refs/heads/gitops' }
+                    branch 'main'
+                    expression { env.GIT_BRANCH == 'origin/main' }
+                    expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
             steps {
@@ -613,9 +613,9 @@ pipeline {
         stage('ECS Smoke Test') {
             when {
                 anyOf {
-                    branch 'gitops'
-                    expression { env.GIT_BRANCH == 'origin/gitops' }
-                    expression { env.GIT_BRANCH == 'refs/heads/gitops' }
+                    branch 'main'
+                    expression { env.GIT_BRANCH == 'origin/main' }
+                    expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
             steps {
