@@ -162,10 +162,10 @@ pipeline {
         // Stage 3 — Static Code Analysis (parallel)
         // =====================================================================
         stage('Static Code Analysis') {
-            agent { docker { image 'node:20-alpine'; reuseNode true } }
             parallel {
 
                 stage('Backend — TypeScript Check') {
+                    agent { docker { image 'node:20-alpine'; reuseNode true } }
                     steps {
                         dir('backend') {
                             echo 'Running TypeScript compiler check (backend)...'
@@ -177,6 +177,7 @@ pipeline {
                 }
 
                 stage('Frontend — Lint') {
+                    agent { docker { image 'node:20-alpine'; reuseNode true } }
                     steps {
                         dir('frontend') {
                             echo 'Running Next.js lint (frontend)...'
@@ -194,10 +195,10 @@ pipeline {
         // Stage 4 — Dependency Security Audit (lab mode: non-blocking, reports only)
         // =====================================================================
         stage('Dependency Security Audit') {
-            agent { docker { image 'node:20-alpine'; reuseNode true } }
             parallel {
 
                 stage('Backend — npm audit') {
+                    agent { docker { image 'node:20-alpine'; reuseNode true } }
                     steps {
                         dir('backend') {
                             echo 'Running npm audit (backend)...'
@@ -225,6 +226,7 @@ pipeline {
                 }
 
                 stage('Frontend — npm audit') {
+                    agent { docker { image 'node:20-alpine'; reuseNode true } }
                     steps {
                         dir('frontend') {
                             echo 'Running npm audit (frontend)...'
