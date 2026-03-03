@@ -121,25 +121,26 @@ pipeline {
 
                         GITLEAKS_VERSION="8.21.2"
 
-                        mkdir -p "$HOME/bin"
-                        if ! "$HOME/bin/gitleaks" version >/dev/null 2>&1; then
-                          echo "Installing Gitleaks ${GITLEAKS_VERSION} to $HOME/bin..."
+                        GITLEAKS_DIR="./gitleaks-bin"
+                        mkdir -p "$GITLEAKS_DIR"
+                        if ! "$GITLEAKS_DIR/gitleaks" version >/dev/null 2>&1; then
+                          echo "Installing Gitleaks ${GITLEAKS_VERSION} to $GITLEAKS_DIR..."
                           curl -sSL -o /tmp/gitleaks.tar.gz \
                             "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-                          tar -xzf /tmp/gitleaks.tar.gz -C "$HOME/bin" gitleaks
+                          tar -xzf /tmp/gitleaks.tar.gz -C "$GITLEAKS_DIR" gitleaks
                           rm -f /tmp/gitleaks.tar.gz
-                          chmod +x "$HOME/bin/gitleaks"
+                          chmod +x "$GITLEAKS_DIR/gitleaks"
                         fi
 
-                        "$HOME/bin/gitleaks" version
+                        "$GITLEAKS_DIR/gitleaks" version
 
-                        "$HOME/bin/gitleaks" detect \
+                        "$GITLEAKS_DIR/gitleaks" detect \
                           --source . \
                           --report-format json \
                           --report-path gitleaks-report.json \
                           --exit-code 1 || GITLEAKS_EXIT=$?
 
-                        "$HOME/bin/gitleaks" detect \
+                        "$GITLEAKS_DIR/gitleaks" detect \
                           --source . \
                           --report-format csv \
                           --report-path gitleaks-report.csv \
