@@ -273,23 +273,23 @@ pipeline {
         //   NOTE (lab mode): gate status is reported but does NOT block deployment.
         // =====================================================================
         stage('SonarCloud Analysis') {
-            agent { docker { image 'node:20-alpine'; reuseNode true } }
+            agent { docker { image 'node:20'; reuseNode true } }
             steps {
                 echo 'Running SonarCloud analysis...'
                 script {
                     withCredentials([string(credentialsId: 'sonarcloud-token', variable: 'SONAR_TOKEN')]) {
                         withSonarQubeEnv('SonarCloud') {
-                            sh """
+                            sh '''
                                 npx sonar-scanner \
-                                    -Dsonar.organization=${SONAR_ORGANIZATION} \
-                                    -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                    -Dsonar.organization=$SONAR_ORGANIZATION \
+                                    -Dsonar.projectKey=$SONAR_PROJECT_KEY \
                                     -Dsonar.projectName='Notes App' \
                                     -Dsonar.sources=backend/src,frontend/app \
                                     -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/.next/**,**/coverage/** \
                                     -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend/coverage/lcov.info \
                                     -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=${SONAR_TOKEN}
-                            """
+                                    -Dsonar.token=$SONAR_TOKEN
+                            '''
                         }
                     }
                 }
