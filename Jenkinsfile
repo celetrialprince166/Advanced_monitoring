@@ -1,6 +1,12 @@
 // =============================================================================
 // Notes App — Industry-Standard Jenkins Declarative Pipeline
 // =============================================================================
+// Agent Strategy: Docker ephemeral agents (no static build nodes)
+//   - Node.js stages → node:20-alpine (public Docker Hub image)
+//   - Docker/AWS stages → jenkins-ci-agent:latest (custom, pre-built on host)
+//   - Checkout + Post → runs on Jenkins controller (agent any)
+//   - reuseNode true → all Docker agents share the controller's workspace
+//
 // Stages:
 //   1.  Checkout
 //   2.  Static Code Analysis      (parallel: backend tsc + ESLint | frontend next lint)
@@ -15,32 +21,37 @@
 //   Post: Slack notification + workspace cleanup
 // =============================================================================
 //
-// Required Jenkins Credentials (Manage Jenkins → Credentials):
+// Required Jenkins Credentials (auto-injected via JCasC from .env):
 //   aws-access-key-id      → Secret Text  — AWS Access Key ID
 //   aws-secret-access-key  → Secret Text  — AWS Secret Access Key
-//   aws-region             → Secret Text  — e.g. us-east-1
+//   aws-region             → Secret Text  — e.g. eu-west-1
 //   ecr-registry           → Secret Text  — <account>.dkr.ecr.<region>.amazonaws.com
 //   ec2-host               → Secret Text  — EC2 public IP or hostname
 //   ec2-ssh-key            → SSH Username with private key — ubuntu
-//   db-username            → Secret Text $ 
+//   db-username            → Secret Text
 //   db-password            → Secret Text
 //   db-name                → Secret Text
 //   sonarcloud-token       → Secret Text  — SonarCloud user token
 //   slack-token            → Secret Text  — Slack Bot OAuth token
 //   codedeploy-app-name    → Secret Text  — from terraform output codedeploy_app_name
 //   codedeploy-deployment-group → Secret Text — from terraform output codedeploy_deployment_group
+//   ecs-alb-dns-name       → Secret Text  — ECS ALB DNS name
+//   ecs-cluster-name       → Secret Text  — ECS cluster name
+//   ecs-service-name       → Secret Text  — ECS service name
+//   ecs-task-execution-role-arn → Secret Text — ECS task execution role ARN
+//   ecs-task-role-arn      → Secret Text  — ECS task role ARN
+//   otel-exporter-otlp-endpoint → Secret Text — OpenTelemetry OTLP endpoint
 //
-// Required Jenkins Plugins:
+// Required Jenkins Plugins (auto-installed via plugins.txt):
 //   Pipeline, Git, Docker Pipeline, AWS Credentials, Amazon ECR,
 //   SonarQube Scanner, JUnit, HTML Publisher, Slack Notification,
-//   Timestamper, Workspace Cleanup, Blue Ocean (optional)
+//   Timestamper, Workspace Cleanup, AnsiColor, Configuration as Code
 // =============================================================================
 
 pipeline {
 
-    agent {
-        label 'agent'
-    }
+    // Agent: runs Checkout + Post on the controller, per-stage Docker agents
+    agent any
 
     // -------------------------------------------------------------------------
     // Global options
@@ -101,6 +112,7 @@ pipeline {
         //   NOTE (lab mode): findings are reported but do NOT block the pipeline.
         // =====================================================================
         stage('Secret Scan — Gitleaks') {
+            agent { docker { image 'jenkins-ci-agent:latest'; reuseNode true } }
             steps {
                 echo 'Running Gitleaks secret scan...'
                 script {
@@ -150,6 +162,7 @@ pipeline {
         // Stage 3 — Static Code Analysis (parallel)
         // =====================================================================
         stage('Static Code Analysis') {
+            agent { docker { image 'node:20-alpine'; reuseNode true } }
             parallel {
 
                 stage('Backend — TypeScript Check') {
@@ -181,6 +194,7 @@ pipeline {
         // Stage 4 — Dependency Security Audit (lab mode: non-blocking, reports only)
         // =====================================================================
         stage('Dependency Security Audit') {
+            agent { docker { image 'node:20-alpine'; reuseNode true } }
             parallel {
 
                 stage('Backend — npm audit') {
@@ -244,6 +258,7 @@ pipeline {
         // Stage 4 — Unit Tests & Coverage (skipped — no test scripts configured)
         // =====================================================================
         stage('Unit Tests & Coverage') {
+            agent { docker { image 'node:20-alpine'; reuseNode true } }
             steps {
                 echo 'Skipping tests — no test scripts configured in package.json yet.'
                 echo 'To enable: add Jest + test scripts to backend/frontend package.json'
@@ -255,6 +270,7 @@ pipeline {
         //   NOTE (lab mode): gate status is reported but does NOT block deployment.
         // =====================================================================
         stage('SonarCloud Analysis') {
+            agent { docker { image 'node:20-alpine'; reuseNode true } }
             steps {
                 echo 'Running SonarCloud analysis...'
                 script {
@@ -292,6 +308,7 @@ pipeline {
         // Stage 6 — Docker Build
         // =====================================================================
         stage('Docker Build') {
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo "Building Docker images (tag: ${env.IMAGE_TAG})..."
                 withCredentials([string(credentialsId: 'ecr-registry', variable: 'ECR_REGISTRY')]) {
@@ -328,6 +345,7 @@ pipeline {
         // Stage 7 — Image Vulnerability Scan (Trivy — lab mode: non-blocking)
         // =====================================================================
         stage('Image Vulnerability Scan') {
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Scanning Docker images with Trivy...'
                 withCredentials([string(credentialsId: 'ecr-registry', variable: 'ECR_REGISTRY')]) {
@@ -385,6 +403,7 @@ pipeline {
         // Stage 8 — SBOM Generation (Syft)
         // =====================================================================
         stage('SBOM Generation — Syft') {
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Generating SBOMs with Syft...'
                 withCredentials([string(credentialsId: 'ecr-registry', variable: 'ECR_REGISTRY')]) {
@@ -454,6 +473,7 @@ pipeline {
                     expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Pushing images to Amazon ECR...'
                 script {
@@ -495,6 +515,7 @@ pipeline {
                     expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Rendering ECS task definition and registering new revision...'
                 withCredentials([
@@ -558,6 +579,7 @@ pipeline {
                     expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Deploying to ECS via CodeDeploy (blue/green)...'
                 withCredentials([
@@ -620,6 +642,7 @@ pipeline {
                     expression { env.GIT_BRANCH == 'refs/heads/main' }
                 }
             }
+            agent { docker { image 'jenkins-ci-agent:latest'; args '-v /var/run/docker.sock:/var/run/docker.sock -u root'; reuseNode true } }
             steps {
                 echo 'Running smoke test against ECS ALB...'
                 withCredentials([string(credentialsId: 'ecs-alb-dns-name', variable: 'ECS_ALB_DNS_NAME')]) {

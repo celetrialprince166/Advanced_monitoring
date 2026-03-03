@@ -1,0 +1,43 @@
+# =============================================================================
+# Jenkins Plugins — Required by Jenkinsfile
+# =============================================================================
+# Each line: plugin-id:version (or :latest)
+# Installed at Docker build time via: jenkins-plugin-cli --plugin-file plugins.txt
+# =============================================================================
+
+# Pipeline / Workflow
+workflow-aggregator:latest
+pipeline-stage-view:latest
+
+# Git
+git:latest
+
+# Docker agent support (enables: agent { docker { image '...' } })
+docker-workflow:latest
+
+# AWS
+amazon-ecr:latest
+aws-credentials:latest
+
+# SonarQube / SonarCloud
+sonar:latest
+
+# Slack Notifications
+slack:latest
+
+# Test & Report
+junit:latest
+htmlpublisher:latest
+
+# Build Utilities
+timestamper:latest
+ws-cleanup:latest
+ansicolor:latest
+
+# Jenkins Configuration as Code (JCasC)
+configuration-as-code:latest
+
+# Credentials
+credentials:latest
+credentials-binding:latest
+ssh-credentials:latest

@@ -1,0 +1,48 @@
+# =============================================================================
+# Jenkins Docker Compose — Controller + Docker Socket
+# =============================================================================
+# Runs the Jenkins controller with:
+#   - Pre-installed plugins (built into the image)
+#   - JCasC configuration mounted in
+#   - Docker socket mounted for ephemeral Docker build agents
+#   - Secrets injected from .env file
+# =============================================================================
+
+services:
+  jenkins:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jenkins-controller
+    restart: unless-stopped
+    ports:
+      - "8080:8080" # Jenkins web UI
+      - "50000:50000" # Jenkins agent communication (JNLP)
+    volumes:
+      # Persistent Jenkins data
+      - jenkins_home:/var/jenkins_home
+      # Docker socket — allows Jenkins to spawn Docker containers as build agents
+      - /var/run/docker.sock:/var/run/docker.sock
+      # JCasC configuration (read-only)
+      - ./jenkins.yaml:/var/jenkins_home/casc/jenkins.yaml:ro
+    env_file:
+      - .env
+    # Fix Docker socket permission: add jenkins user to the host's docker group ID
+    group_add:
+      - "${DOCKER_GID}"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/login"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    labels:
+      - "com.docker.compose.project=jenkins"
+      - "com.docker.compose.service=controller"
+
+volumes:
+  jenkins_home:
+    driver: local
+    name: jenkins-home-data
+    labels:
+      - "com.docker.compose.project=jenkins"
