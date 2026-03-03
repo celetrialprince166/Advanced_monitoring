@@ -281,14 +281,14 @@ pipeline {
                         withSonarQubeEnv('SonarCloud') {
                             sh '''
                                 sonar-scanner \
-                                    -Dsonar.organization=$SONAR_ORGANIZATION \
-                                    -Dsonar.projectKey=$SONAR_PROJECT_KEY \
-                                    -Dsonar.projectName='Notes App' \
-                                    -Dsonar.sources=backend/src,frontend/app \
-                                    -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/.next/**,**/coverage/** \
-                                    -Dsonar.javascript.lcov.reportPaths=backend/coverage/lcov.info,frontend/coverage/lcov.info \
-                                    -Dsonar.host.url=https://sonarcloud.io \
-                                    -Dsonar.token=$SONAR_TOKEN
+                                    -Dsonar.organization="$SONAR_ORGANIZATION" \
+                                    -Dsonar.projectKey="$SONAR_PROJECT_KEY" \
+                                    -Dsonar.projectName="Notes App" \
+                                    -Dsonar.sources="backend/src,frontend/app" \
+                                    -Dsonar.exclusions="**/node_modules/**,**/dist/**,**/.next/**,**/coverage/**" \
+                                    -Dsonar.javascript.lcov.reportPaths="backend/coverage/lcov.info,frontend/coverage/lcov.info" \
+                                    -Dsonar.host.url="https://sonarcloud.io" \
+                                    -Dsonar.token="$SONAR_TOKEN"
                             '''
                         }
                     }
