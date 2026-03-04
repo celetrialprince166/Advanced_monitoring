@@ -1,6 +1,6 @@
-# Multi-Container Notes Application — Advanced Observability & Distributed Tracing
+# Multi-Container Notes Application — Advanced Observability, Distributed Tracing & Auto-Remediation
 
-A production-grade full-stack Notes application with end-to-end observability, distributed tracing, and automated alerting. This project demonstrates OpenTelemetry instrumentation, Prometheus metrics collection, Jaeger trace correlation, and alert-driven incident response workflows deployed on AWS ECS Fargate with Blue/Green deployment strategy.
+A production-grade full-stack Notes application with end-to-end observability, distributed tracing, automated alerting, and event-driven auto-remediation. This project demonstrates OpenTelemetry instrumentation, Prometheus metrics collection, Jaeger trace correlation, alert-driven incident response workflows, ECS auto-scaling, and post-deployment auto-remediation — deployed on AWS ECS Fargate with Blue/Green deployment strategy.
 
 ---
 
@@ -14,6 +14,7 @@ A production-grade full-stack Notes application with end-to-end observability, d
 - [Installation](#installation)
 - [Usage](#usage)
 - [Observability Stack](#observability-stack)
+- [Production Automation](#production-automation)
 - [Alert → Trace → Log Correlation](#alert--trace--log-correlation)
 - [Project Structure](#project-structure)
 - [Learning Outcomes](#learning-outcomes)
@@ -29,7 +30,7 @@ A production-grade full-stack Notes application with end-to-end observability, d
 
 This project implements a containerized Notes application with comprehensive observability instrumentation. The application exposes RED metrics (Rate, Errors, Duration) via Prometheus, exports distributed traces to Jaeger using OpenTelemetry, and correlates logs with trace IDs for root cause analysis. Alert rules trigger on error rate >5% or P95 latency >300ms, enabling symptom → trace → log workflows for rapid incident resolution.
 
-The infrastructure runs on AWS ECS Fargate with Blue/Green deployments via CodeDeploy, providing zero-downtime releases with automatic rollback on CloudWatch alarm triggers.
+The infrastructure runs on AWS ECS Fargate with Blue/Green deployments via CodeDeploy, providing zero-downtime releases with automatic rollback on CloudWatch alarm triggers. Post-deployment, event-driven auto-remediation automatically recycles broken ECS tasks when sustained 5xx errors are detected, while CPU-based auto-scaling dynamically adjusts capacity under load.
 
 ---
 
@@ -63,6 +64,10 @@ A dedicated monitoring server runs Prometheus, Alertmanager, Grafana, and Jaeger
 ### Architecture Diagram
 
 ![Advanced Observability Stack Architecture](images/advobsevabilitystack.png)
+
+### Observability + Auto-Remediation Architecture
+
+![Observability & Auto-Remediation Architecture](images/advobsevabilitystack_v2.png)
 
 ### ECS Fargate Architecture
 
@@ -101,6 +106,13 @@ A dedicated monitoring server runs Prometheus, Alertmanager, Grafana, and Jaeger
 - **Terraform**: Infrastructure-as-code for AWS. Provisions ECS, ALB, ECR, IAM roles, security groups, and CloudWatch alarms.
 - **GitHub Actions**: CI/CD automation. Runs tests, builds images, pushes to ECR, and triggers CodeDeploy.
 - **Amazon ECR**: Container registry for application images. Integrated with IAM and avoids Docker Hub rate limits.
+
+### Production Automation
+
+- **AWS CloudWatch Alarms**: Monitors `HTTPCode_Target_5XX_Count` for sustained post-deployment errors (separate from the deployment-scoped rollback alarm).
+- **Amazon SNS**: Event bus routing alarm notifications to the remediation Lambda function.
+- **AWS Lambda (Python 3.12)**: Event-driven auto-remediation — recycles broken ECS tasks via `ecs:StopTask` with idempotency guards and Slack notifications.
+- **Application Auto Scaling**: CPU-based target tracking policy scales ECS `desired_count` between 1–4 based on `ECSServiceAverageCPUUtilization`.
 
 ---
 
@@ -154,6 +166,8 @@ Terraform provisions:
 - CloudWatch alarms for automatic rollback (5xx errors, unhealthy targets)
 - Dedicated monitoring EC2 instance with Prometheus, Grafana, Jaeger, and Alertmanager
 - Security groups restricting metrics ports to monitoring server only
+- **ECS Service Auto Scaling** with CPU target tracking (min=1, max=4)
+- **Event-driven auto-remediation** (CloudWatch Alarm → SNS → Lambda → `ecs:StopTask`)
 
 ### 4. Configure GitHub Secrets
 
@@ -354,6 +368,47 @@ A pre-provisioned **Notes App Dashboard** is auto-loaded on first boot with pane
 
 ---
 
+## Production Automation
+
+### ECS Service Auto-Scaling
+
+The ECS service is registered as an Application Auto Scaling target with a CPU-based target tracking policy:
+
+| Parameter | Value |
+|---|---|
+| Min capacity | 1 task |
+| Max capacity | 4 tasks |
+| Target CPU | 70% |
+| Scale-out cooldown | 60 seconds |
+| Scale-in cooldown | 300 seconds |
+
+When average CPU utilization exceeds 70%, ECS automatically launches additional tasks. When load subsides, tasks are removed after a 5-minute cooldown. CloudWatch Container Insights (already enabled on the ECS cluster) provides the `ECSServiceAverageCPUUtilization` metric.
+
+**Terraform Resources:** [`auto_scaling.tf`](terraform/auto_scaling.tf)
+
+### Event-Driven Auto-Remediation
+
+A separate CloudWatch alarm monitors `HTTPCode_Target_5XX_Count` **post-deployment** (distinct from the deployment-scoped `alb_5xx` alarm used for CodeDeploy rollbacks). When sustained 5xx errors are detected, the alarm triggers an automated remediation pipeline:
+
+1. **CloudWatch Alarm** fires after >10 5xx errors sustained for 6 minutes (3 × 120s evaluation periods)
+2. **SNS Topic** routes the alarm to the remediation Lambda function
+3. **Lambda Function** (Python 3.12) calls `ecs:ListTasks` → `ecs:StopTask` to recycle broken tasks
+4. **ECS Service Scheduler** automatically launches fresh replacement tasks to maintain `desired_count`
+5. **Slack Notification** is posted with the list of stopped task IDs
+
+**Safety Mechanisms:**
+- **Idempotency guard**: Lambda checks its own CloudWatch logs and skips execution if it ran successfully within the last 10 minutes, preventing infinite remediation loops
+- **Reserved concurrency = 1**: Prevents parallel Lambda invocations from multiple alarm triggers
+- **Separate from deployment alarm**: The remediation alarm is independent of the CodeDeploy rollback alarm, ensuring no interference with blue/green deployments
+
+**Why `ecs:StopTask` instead of `codedeploy:CreateDeployment`?**
+
+The ECS service uses the `CODE_DEPLOY` deployment controller, which rejects `UpdateService(forceNewDeployment)`. A full CodeDeploy blue/green deployment takes minutes with traffic shifting. Stopping individual tasks is lightweight — ECS replaces them in seconds — and is compatible with the CODE_DEPLOY controller.
+
+**Terraform Resources:** [`auto_remediation.tf`](terraform/auto_remediation.tf) | **Lambda Handler:** [`scripts/auto-remediation/handler.py`](scripts/auto-remediation/handler.py)
+
+---
+
 ## Alert → Trace → Log Correlation
 
 This section demonstrates the lab requirement: **alert → trace → log correlation showing root cause identification**.
@@ -459,12 +514,18 @@ Multi_Container_App/
 │       │       └── dashboard.yml  # Dashboard loader config
 │       └── dashboards/
 │           └── notes-app-dashboard.json  # Pre-built dashboard
+├── scripts/
+│   └── auto-remediation/
+│       └── handler.py             # Lambda: ecs:StopTask + Slack notification
 ├── terraform/
 │   ├── main.tf                    # Provider, data sources
 │   ├── ecs.tf                     # ECS cluster, service, task definition
 │   ├── alb.tf                     # Application Load Balancer + target groups
 │   ├── codedeploy.tf              # Blue/Green deployment config
 │   ├── cloudwatch.tf              # Alarms for automatic rollback
+│   ├── auto_scaling.tf            # ECS Service Auto Scaling (CPU target tracking)
+│   ├── auto_remediation.tf        # CloudWatch → SNS → Lambda remediation pipeline
+│   ├── auto_scaling_outputs.tf    # Outputs for automation add-ons
 │   ├── ecr.tf                     # ECR repositories
 │   ├── iam.tf                     # IAM roles, OIDC provider
 │   ├── monitoring.tf              # Monitoring EC2 instance
@@ -496,6 +557,10 @@ Multi_Container_App/
 ✓ Configured CloudWatch Logs with log groups per ECS container  
 ✓ Used Terraform to provision ECS, ALB, CodeDeploy, and monitoring infrastructure  
 ✓ Set up GitHub OIDC for AWS authentication, eliminating static credentials in CI  
+✓ Implemented ECS Service Auto Scaling with CPU target tracking (desired_count 1↔4)  
+✓ Built event-driven auto-remediation (CloudWatch Alarm → SNS → Lambda → ecs:StopTask)  
+✓ Designed idempotency guards to prevent remediation loops in Lambda functions  
+✓ Resolved CODE_DEPLOY controller constraints (ecs:StopTask vs forceNewDeployment)  
 
 ---
 

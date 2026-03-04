@@ -1,0 +1,52 @@
+# Codebase Review: Advanced Observability and DevOps Practices
+
+This document reviews the `Multi_Container_App` project architecture with a strong emphasis on Advanced Observability, DevOps, and cloud-native best practices.
+
+## 1. Code Quality
+The project enforces high code quality standards through automated CI/CD gating rather than relying on manual reviews alone:
+- **Static Code Analysis:** The Jenkins pipeline runs `tsc --noEmit` (TypeScript compiler checks) for the backend and `next lint` (ESLint) for the frontend in parallel at the earliest stages of the build.
+- **SonarCloud Integration:** A dedicated SonarCloud stage performs deep static analysis, measuring code smells, bugs, and test coverage (`lcov.info`). A strict Quality Gate blocks deployments if baseline quality fails.
+
+## 2. Security Practices
+Security is deeply embedded into the pipeline (DevSecOps) and the AWS infrastructure:
+- **Secret Scanning:** `Gitleaks` runs continuously to detect and prevent hardcoded secrets from entering source control.
+- **Vulnerability Scanning:** Dependency audits (`npm audit`) and container image vulnerability scans (`Trivy`) verify that no Critical/High CVEs are deployed to Amazon ECR.
+- **Software Supply Chain:** The pipeline automates the generation of an SBOM (Software Bill of Materials) using `Syft`.
+- **Least Privilege IAM:** AWS resources like the Auto-Remediation Lambda and ECS Task Execution roles are restricted to the absolute minimum necessary permissions (e.g., `ecs:StopTask` rather than full ECS admin).
+
+## 3. Testing Strategy
+Testing spans multiple vectors across the application lifecycle:
+- **Unit Testing Frameworks:** The CI/CD pipeline contains dedicated steps for unit tests and coverage reporting (e.g., Jest/Mocha integrated into SonarCloud reporting).
+- **Post-Deployment Smoke Tests:** Immediately following a CodeDeploy Blue/Green deployment, the Jenkins pipeline runs an automated Smoke Test against the ALB. It actively polls the endpoint for a 200/301/302 HTTP response before declaring success.
+- **Container Health Checks:** Docker/ECS health checks actively verify container readiness. The Proxy container expects a `200 OK` from `/nginx-health`, while the Database expects `pg_isready`, preventing unhealthy tasks from receiving live traffic.
+
+## 4. Tools and Technologies
+The architecture strictly adheres to modern, open-source, and cloud-native tooling:
+- **Advanced Observability Stack:**
+  * **OpenTelemetry (OTel):** The unified standard for instrumenting tracing and metrics data from the application layer.
+  * **Prometheus:** Scrapes and stores time-series metric data points.
+  * **Grafana:** Visualizes metrics and creates actionable dashboards.
+  * **Jaeger:** Acts as the backend for Distributed Tracing, mapping requests as they travel across the Nginx proxy, Frontend, Backend, and Database.
+  * **Alertmanager:** Evaluates Prometheus rule files and routes alerts to external channels (e.g., Slack).
+- **Infrastructure & Compute:** AWS ECS on Fargate, Application Load Balancer (ALB), and Amazon SNS.
+- **Infrastructure as Code (IaC):** Terraform CLI handles deterministic provisioning of all AWS resources.
+- **CI/CD:** Jenkins (Declarative pipeline syntax with Docker ephemeral agents).
+
+## 5. Solution Design (Observability-First Architecture)
+The solution is designed around the principle of **event-driven observability** rather than passive monitoring:
+- **Distributed Tracing & Context Propagation:** As a user action enters the Nginx Proxy, a Trace ID is generated and propagated through the Next.js frontend to the Express backend. This allows engineers to see precisely where an HTTP 500 occurred in Jaeger.
+- **Blue/Green Deployment:** AWS CodeDeploy shifts traffic incrementally between the 'blue' and 'green' ALB target groups during release. If the CloudWatch 5xx Error Alarm triggers during this window, CodeDeploy automatically rolls back to the previous stable version.
+- **Event-Driven Auto Remediation:** Beyond deployment rollbacks, post-deployment degraded performance is handled automatically. If the ALB registers sustained 5xx errors, CloudWatch triggers an SNS topic that invokes a Python AWS Lambda script to gracefully recycle the broken ECS Tasks (`ecs:StopTask`).
+- **Dynamic Auto-Scaling:** Application Auto-Scaling Target Tracking policies monitor CloudWatch Container Insights (`ECSServiceAverageCPUUtilization`). When CPU thresholds are breached (>70%), the ECS desired count dynamically expands to handle the load.
+
+## 6. Cost Optimization Techniques
+- **Serverless Compute (Fargate):** Compute costs are directly tied to actual usage. Fargate eliminates the overhead of provisioning, patching, and paying for idle EC2 instances.
+- **Dynamic Rightsizing:** Through CPU and Request Count target tracking policies, the application automatically scales down to `desired_count = 1` during periods of low traffic, minimizing compute expenditure.
+- **Log Retention Strategies:** CloudWatch Log Groups heavily penalize organizations for perpetual default retention. The infrastructure specifies explicit 30-day log retention windows for application logs and Lambda executions.
+- **Ephemeral CI/CD Agents:** Jenkins jobs run entirely on short-lived Docker containers (`node:20-alpine`, `jenkins-ci-agent`) rather than relying on expensive, persistently running static worker nodes.
+
+## 7. DevOps Practices
+- **Infrastructure as Code (IaC):** Every piece of AWS infrastructure, including complex auto-remediation triggers, IAM roles, and scaling policies, is codified in Terraform. This ensures the environment can be torn down and perfectly replicated in another region in minutes.
+- **Continuous Deployment Pipeline:** Commits to the `main` branch trigger a fully automated workflow that handles semantic versioning, image tagging (via short Git SHAs), ECR uploads, and CodeDeploy triggers.
+- **Shift-Left Security:** The CI/CD pipeline performs Trivy and Gitleaks checks during the "Build" phase, catching issues locally before they can ever reach deployment.
+- **Feedback Loops (ChatOps):** Slack Webhooks are heavily integrated into the ecosystem. Failed builds in Jenkins, Prometheus alerts (like `HighErrorRate`), and successful Lambda Auto-Remediations instantly post detailed alerts to the `#ci-cd-alerts` channel.
