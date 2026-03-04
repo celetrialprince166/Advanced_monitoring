@@ -63,7 +63,6 @@ A dedicated monitoring server runs Prometheus, Alertmanager, Grafana, and Jaeger
 
 ### Architecture Diagram
 
-![Advanced Observability Stack Architecture](images/advobsevabilitystack.png)
 
 ### Observability + Auto-Remediation Architecture
 
