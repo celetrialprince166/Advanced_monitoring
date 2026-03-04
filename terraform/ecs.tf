@@ -1,9 +1,9 @@
- # =============================================================================
- # ECS Cluster (Fargate) for Notes App
- # =============================================================================
- # Purpose: Provide an ECS cluster to run the existing backend/frontend/proxy
- # containers on Fargate. The service below wires the tasks to the ALB.
- # =============================================================================
+# =============================================================================
+# ECS Cluster (Fargate) for Notes App
+# =============================================================================
+# Purpose: Provide an ECS cluster to run the existing backend/frontend/proxy
+# containers on Fargate. The service below wires the tasks to the ALB.
+# =============================================================================
 
 resource "aws_ecs_cluster" "notes_app" {
   name = "${var.environment}-notes-app-ecs-cluster"
@@ -60,9 +60,9 @@ resource "aws_ecs_task_definition" "notes_app_bootstrap" {
   ])
 }
 
- # =============================================================================
- # ECS Service for Notes App
- # =============================================================================
+# =============================================================================
+# ECS Service for Notes App
+# =============================================================================
 
 resource "aws_ecs_service" "notes_app" {
   name            = "${var.environment}-notes-app-service"
@@ -96,7 +96,7 @@ resource "aws_ecs_service" "notes_app" {
   }
 
   lifecycle {
-    ignore_changes = [task_definition]
+    ignore_changes = [task_definition, desired_count, load_balancer]
   }
 
   tags = merge(
